@@ -1,0 +1,43 @@
+image: docker:stable
+
+services:
+  - docker:dind
+
+variables:
+  DOCKER_HOST: tcp://docker:2375
+
+before_script:
+  - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+  - docker info
+
+stages:
+  - build
+  - publish
+  - deploy
+
+build:
+  stage: build
+  script:
+    - docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG || true
+    - docker build --cache-from $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG --tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA .
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+  tags:
+    - docker
+
+publish:
+  stage: publish
+  script:
+    - docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA || true
+    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
+  tags:
+    - docker
+
+deploy:
+  stage: deploy
+  script:
+    - echo deploy
+  tags:
+    - docker
+  only:
+    - production
