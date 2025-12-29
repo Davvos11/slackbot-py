@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from dotenv import load_dotenv
 from icalevents.icalevents import events
@@ -26,10 +26,11 @@ class Calendar:
             self._update()
 
     def get_next(self, query: str) -> Event | None:
+        now = datetime.now(timezone.utc)
         self._check_update()
         query = query.lower()
         try:
-            match = next(e for e in self.events if query in e.summary.lower())
+            match = next(e for e in self.events if e.start and e.start > now and query in e.summary.lower())
         except StopIteration:
             return None
         return match
