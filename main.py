@@ -25,14 +25,14 @@ emoji = [
 
 @app.message(re.compile(r"is het al vckantie", re.IGNORECASE))
 def message_hello(message, say):
-    event = calendar.get_next("vckantie")
+    event = calendar.get_next("vckantie", "aanbetaling")
     if event is None:
         say(text="Geen volgende vckantie in de agenda gevonden :sad_sunglasses:")
         return
     delta = event.start - datetime.now(tz=event.start.tzinfo)
     hours, rem = divmod(delta.seconds, 3600)
     minutes, seconds = divmod(rem, 60)
-    say(text=f"Nog {delta.days} dagen, {hours} uur en {minutes} minuten tot {event.summary}! {random.choice(emoji)}")
+    say(text=f"Nog {delta.days} dagen, {hours} uur en {minutes} minuten tot {event.summary.strip()}! {random.choice(emoji)}")
 
 
 if __name__ == "__main__":

@@ -22,15 +22,34 @@ class Calendar:
         self.updated = start
 
     def _check_update(self):
-        if (datetime.now() - self.updated) < timedelta(seconds=10):
+        if (datetime.now() - self.updated) > timedelta(minutes=1):
             self._update()
 
-    def get_next(self, query: str) -> Event | None:
+    def get_next(self, query: str, exclude: str | None = None) -> Event | None:
         now = datetime.now(timezone.utc)
         self._check_update()
         query = query.lower()
-        try:
-            match = next(e for e in self.events if e.start and e.start > now and query in e.summary.lower())
-        except StopIteration:
-            return None
-        return match
+        for event in self.events:
+            title = event.summary.lower()
+            if event.start and event.start > now and query in title:
+                if exclude is not None and exclude in title:
+                    continue
+                return event
+        return None
+
+
+def test():
+    load_dotenv()
+    calendar = Calendar()
+    event = calendar.get_next("vckantie", "aanbetaling")
+    if event is None:
+        print("Geen volgende vckantie in de agenda gevonden")
+        exit(0)
+    delta = event.start - datetime.now(tz=event.start.tzinfo)
+    hours, rem = divmod(delta.seconds, 3600)
+    minutes, seconds = divmod(rem, 60)
+    print(f"Nog {delta.days} dagen, {hours} uur en {minutes} minuten tot {event.summary.strip()}!")
+
+
+if __name__ == '__main__':
+    test()
