@@ -8,4 +8,4 @@ RUN ["uv", "sync", "--locked"]
 
 COPY . .
 
-CMD ["uv", "run", "main.py"]
+CMD ["uv", "run", "src/main.py"]
