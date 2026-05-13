@@ -167,8 +167,6 @@ def main():
                                             from_station="PT", to_station="UT", via_station=None)
     schedule.every().thursday.at("16:00").do(send_message, time="16:29", journeys=1, user_id="UP1H87YA3",
                                              from_station="PT", to_station="UT", via_station=None)
-    schedule.every().minute.do(send_message, time="16:29", journeys=1, user_id="UP1H87YA3",
-                                             from_station="PT", to_station="UT", via_station=None)
     # @staal: je user_id is U2UMXJQ7R, de afkortingen van stations kan je vinden op https://zonindetrein.nl/api/stations
 
     print("Starting scheduler...")
