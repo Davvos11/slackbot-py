@@ -169,6 +169,15 @@ def main():
                                              from_station="PT", to_station="UT", via_station=None)
     # @staal: je user_id is U2UMXJQ7R, de afkortingen van stations kan je vinden op https://zonindetrein.nl/api/stations
 
+    schedule.every().monday.at("15:25").do(send_message, time="15:54", journeys=3, user_id="U2UMXJQ7R",
+                                             from_station="DT", to_station="UT", via_station="RTD")
+    schedule.every().thursday.at("15:25").do(send_message, time="15:54", journeys=3, user_id="U2UMXJQ7R",
+                                             from_station="DT", to_station="UT", via_station="RTD")
+    schedule.every().friday.at("15:25").do(send_message, time="15:54", journeys=3, user_id="U2UMXJQ7R",
+                                             from_station="DT", to_station="UT", via_station="RTD")
+    schedule.every().tuesday.at("16:45").do(send_message, time="17:37", journeys=1, user_id="U2UMXJQ7R",
+                                            from_station="UT", to_station="LEDN", via_station="ASDZ")
+
     print("Starting scheduler...")
     while True:
         schedule.run_pending()
