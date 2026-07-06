@@ -159,16 +159,27 @@ def send_message(time: str, journeys: int, user_id: str, from_station: str, to_s
 
 def main():
     load_dotenv()
+    # Note: de afkortingen van stations kan je vinden op https://zonindetrein.nl/api/stations
+
+    # David:
+    schedule.every().monday.at("07:00").do(send_message, time="07:51", journeys=1, user_id="UP1H87YA3",
+                                            from_station="UT", to_station="PT", via_station=None)
+    schedule.every().monday.at("16:00").do(send_message, time="16:29", journeys=1, user_id="UP1H87YA3",
+                                            from_station="PT", to_station="UT", via_station=None)
     schedule.every().tuesday.at("07:00").do(send_message, time="07:51", journeys=1, user_id="UP1H87YA3",
                                             from_station="UT", to_station="PT", via_station=None)
-    schedule.every().thursday.at("07:00").do(send_message, time="07:51", journeys=1, user_id="UP1H87YA3",
-                                             from_station="UT", to_station="PT", via_station=None)
     schedule.every().tuesday.at("16:00").do(send_message, time="16:29", journeys=1, user_id="UP1H87YA3",
                                             from_station="PT", to_station="UT", via_station=None)
+    schedule.every().thursday.at("07:00").do(send_message, time="07:51", journeys=1, user_id="UP1H87YA3",
+                                             from_station="UT", to_station="PT", via_station=None)
     schedule.every().thursday.at("16:00").do(send_message, time="16:29", journeys=1, user_id="UP1H87YA3",
                                              from_station="PT", to_station="UT", via_station=None)
-    # @staal: je user_id is U2UMXJQ7R, de afkortingen van stations kan je vinden op https://zonindetrein.nl/api/stations
+    schedule.every().friday.at("07:00").do(send_message, time="07:51", journeys=1, user_id="UP1H87YA3",
+                                             from_station="UT", to_station="PT", via_station=None)
+    schedule.every().friday.at("16:00").do(send_message, time="16:29", journeys=1, user_id="UP1H87YA3",
+                                             from_station="PT", to_station="UT", via_station=None)
 
+    # Staal:
     schedule.every().monday.at("14:55").do(send_message, time="15:59", journeys=1, user_id="U2UMXJQ7R",
                                              from_station="DT", to_station="UT", via_station="RTD")
     schedule.every().monday.at("14:55").do(send_message, time="15:57", journeys=1, user_id="U2UMXJQ7R",
