@@ -1,5 +1,5 @@
-import json
 import os
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from time import sleep
@@ -43,6 +43,12 @@ class NS:
         response = self._get_json("https://gateway.apiportal.ns.nl/reisinformatie-api/api/v3/trips", params=params)
         return Trip.from_data(response)
 
+    def get_train(self, trein_nr: int, station: str) -> 'Train':
+        response = self._get_json(
+            f"https://gateway.apiportal.ns.nl/virtual-train-api/v1/trein?ids={trein_nr}&stations={station}")
+        result = Train.from_data(response)
+        return result
+
     def get_stations(self) -> dict[str, str]:
         response = self._get_json("https://gateway.apiportal.ns.nl/nsapp-stations/v3?includeNonPlannableStations=false")
         stations = [(station["id"]["code"], station["names"]["long"]) for station in response["payload"]]
@@ -76,6 +82,18 @@ class Trip:
     legs: list['Leg']
     status: str
     url: Optional[str]
+    crowd_forecast: str
+
+    def get_drukte_emoji(self):
+        match self.crowd_forecast:
+            case "LOW":
+                return ":rustig:"
+            case "MEDIUM":
+                return ":gemiddeld_druk:"
+            case "HIGH":
+                return ":druk:"
+            case _:
+                return ""
 
     @property
     def cancelled(self):
@@ -98,12 +116,16 @@ class Trip:
                 else:
                     message = title
             status = trip.get('status')
+            trip_forecast = trip.get('crowdForecast')
             url = trip.get('shareUrl', {}).get('uri')
             legs = []
             legs_data = trip['legs']
             for leg in legs_data:
                 if leg.get('travelType') != "PUBLIC_TRANSIT":
                     continue
+                name = leg.get('name')
+                nr_match = re.search(r'\S+ (\d+)', name)
+                ritnummer = int(nr_match.group(1)) if nr_match else 0
                 notes = leg.get('product', {}).get('notes', [])
                 description = get_desc_from_notes(notes, ['PRODUCT_INTERMEDIATE_STOPS'])
                 origin = leg['origin']
@@ -116,9 +138,52 @@ class Trip:
                 if datetime_actual:
                     datetime_actual = datetime.strptime(datetime_actual, '%Y-%m-%dT%H:%M:%S%z')
                 cancelled = leg['cancelled']
-                legs.append(Leg(description, track_planned, track_actual, datetime_planned, datetime_actual, cancelled))
-            result.append(Trip(duration_planned, duration_actual, transfers, message, legs, status, url))
+                from_station = leg.get('origin', dict()).get('stationCode')
+                leg_forecast = leg.get('crowdForecast')
+                legs.append(Leg(ritnummer, from_station, description, track_planned, track_actual, datetime_planned,
+                                datetime_actual, cancelled, leg_forecast))
+            result.append(Trip(duration_planned, duration_actual, transfers, message, legs, status, url, trip_forecast))
         return result
+
+
+@dataclass
+class TrainPart:
+    materieelnummer: int
+    type: str
+    bakken: list
+
+
+@dataclass
+class Train:
+    ritnummer: int
+    station: str
+    type: str
+    lengte: int
+    materieeldelen: list[TrainPart]
+
+    def get_treinposities(self, dt: datetime) -> str:
+        date_str = dt.strftime('%Y%m%d')
+        return f"https://treinposities.nl/ritinfo/{date_str}/{self.ritnummer}"
+
+    @staticmethod
+    def from_data(data: list[dict]) -> 'Train':
+        data = data[0]
+        delen = [
+            TrainPart(
+                materieelnummer=part_data['materieelnummer'],
+                type=part_data['type'],
+                bakken=part_data['bakken'],
+            )
+            for part_data in data['materieeldelen']
+        ]
+
+        return Train(
+            ritnummer=data['ritnummer'],
+            station=data['station'],
+            type=data['type'],
+            lengte=data['lengte'],
+            materieeldelen=delen,
+        )
 
 
 def get_desc_from_notes(notes: list[list[dict[str, Any]]], ignore: list[str]) -> str:
@@ -132,12 +197,26 @@ def get_desc_from_notes(notes: list[list[dict[str, Any]]], ignore: list[str]) ->
 
 @dataclass
 class Leg:
+    ritnummer: int
+    from_station: str
     description: str
     track_planned: Optional[int]
     track_actual: Optional[int]
     datetime_planned: Optional[datetime]
     datetime_actual: Optional[datetime]
     cancelled: bool
+    crowd_forecast: str
+
+    def get_drukte_emoji(self):
+        match self.crowd_forecast:
+            case "LOW":
+                return ":rustig:"
+            case "MEDIUM":
+                return ":gemiddeld_druk:"
+            case "HIGH":
+                return ":druk:"
+            case _:
+                return ""
 
 
 def send_message(time: str, journeys: int, user_id: str, from_station: str, to_station: str,
@@ -145,9 +224,13 @@ def send_message(time: str, journeys: int, user_id: str, from_station: str, to_s
     print(f"Sending message: {user_id} {time} {from_station} -> {via_station} -> {to_station} (max {journeys})")
     ns = NS()
     try:
-        trip = ns.get_trip(time, from_station, to_station, via_station)
+        trips = ns.get_trip(time, from_station, to_station, via_station)
+        trains = dict()
+        for trip in trips:
+            for leg in trip.legs:
+                trains[leg.ritnummer] = ns.get_train(leg.ritnummer, leg.from_station)
         url = ns.generate_reisplanner_url(time, from_station, to_station, via_station)
-        send_trein_message(trip, journeys, url, user_id)
+        send_trein_message(trips, trains, journeys, url, user_id)
     except HTTPError as e:
         if data := e.response.text:
             send_error_message(data)
@@ -159,13 +242,16 @@ def send_message(time: str, journeys: int, user_id: str, from_station: str, to_s
 
 def main():
     load_dotenv()
+    # send_message("18:56", journeys=3, user_id="UP1H87YA3", from_station="DT", to_station="UT", via_station="RTD")
+    # exit()
+
     # Note: de afkortingen van stations kan je vinden op https://zonindetrein.nl/api/stations
 
     # David:
     schedule.every().monday.at("07:00").do(send_message, time="07:51", journeys=1, user_id="UP1H87YA3",
-                                            from_station="UT", to_station="PT", via_station=None)
+                                           from_station="UT", to_station="PT", via_station=None)
     schedule.every().monday.at("16:00").do(send_message, time="16:29", journeys=1, user_id="UP1H87YA3",
-                                            from_station="PT", to_station="UT", via_station=None)
+                                           from_station="PT", to_station="UT", via_station=None)
     schedule.every().tuesday.at("07:00").do(send_message, time="07:51", journeys=1, user_id="UP1H87YA3",
                                             from_station="UT", to_station="PT", via_station=None)
     schedule.every().tuesday.at("16:00").do(send_message, time="16:29", journeys=1, user_id="UP1H87YA3",
@@ -175,23 +261,23 @@ def main():
     schedule.every().thursday.at("16:00").do(send_message, time="16:29", journeys=1, user_id="UP1H87YA3",
                                              from_station="PT", to_station="UT", via_station=None)
     schedule.every().friday.at("07:00").do(send_message, time="07:51", journeys=1, user_id="UP1H87YA3",
-                                             from_station="UT", to_station="PT", via_station=None)
+                                           from_station="UT", to_station="PT", via_station=None)
     schedule.every().friday.at("16:00").do(send_message, time="16:29", journeys=1, user_id="UP1H87YA3",
-                                             from_station="PT", to_station="UT", via_station=None)
+                                           from_station="PT", to_station="UT", via_station=None)
 
     # Staal:
     schedule.every().monday.at("14:55").do(send_message, time="15:59", journeys=1, user_id="U2UMXJQ7R",
-                                             from_station="DT", to_station="UT", via_station="RTD")
+                                           from_station="DT", to_station="UT", via_station="RTD")
     schedule.every().monday.at("14:55").do(send_message, time="15:57", journeys=1, user_id="U2UMXJQ7R",
-                                             from_station="DT", to_station="UT", via_station="GVC")
+                                           from_station="DT", to_station="UT", via_station="GVC")
     schedule.every().thursday.at("15:05").do(send_message, time="15:59", journeys=1, user_id="U2UMXJQ7R",
                                              from_station="DT", to_station="UT", via_station="RTD")
     schedule.every().thursday.at("15:05").do(send_message, time="15:57", journeys=1, user_id="U2UMXJQ7R",
                                              from_station="DT", to_station="UT", via_station="GVC")
     schedule.every().friday.at("15:05").do(send_message, time="15:59", journeys=1, user_id="U2UMXJQ7R",
-                                             from_station="DT", to_station="UT", via_station="RTD")
+                                           from_station="DT", to_station="UT", via_station="RTD")
     schedule.every().friday.at("15:05").do(send_message, time="15:57", journeys=1, user_id="U2UMXJQ7R",
-                                             from_station="DT", to_station="UT", via_station="GVC")
+                                           from_station="DT", to_station="UT", via_station="GVC")
     schedule.every().tuesday.at("16:15").do(send_message, time="17:37", journeys=1, user_id="U2UMXJQ7R",
                                             from_station="UT", to_station="LEDN", via_station="ASDZ")
 

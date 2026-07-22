@@ -1,16 +1,14 @@
 from __future__ import annotations
 
-import json
 import os
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 from zoneinfo import ZoneInfo
 
 import requests
-from dotenv import load_dotenv
 
 if TYPE_CHECKING:
-    from ns import Trip
+    from ns import Trip, Train
 
 
 def get_time(dt: Optional[datetime]) -> str:
@@ -30,7 +28,8 @@ def format_slack_user(username: Optional[str]) -> str:
     return f"<@{username}>"
 
 
-def send_trein_message(trips: list[Trip], amount: int, url: str, user_id: Optional[str] = None):
+def send_trein_message(trips: list[Trip], trains: dict[int, Train], amount: int, url: str,
+                       user_id: Optional[str] = None):
     blocks = []
     mention = format_slack_user(user_id)
     if mention:
@@ -63,11 +62,18 @@ def send_trein_message(trips: list[Trip], amount: int, url: str, user_id: Option
         title = f"{cancelled}{time} - {duration} - {spoor}"
         if trip.url:
             title = f"<{trip.url}|{title}>"
-        text = f"*{title}*"
+        text = f"{trip.get_drukte_emoji()} *{title}* "
         if trip.message:
             text += f"\n{trip.message}"
         for leg in trip.legs:
-            text += f"\n- {leg.description}"
+            train = trains[leg.ritnummer]
+            emoji = f":{train.type.lower()}':"
+            dt = leg.datetime_planned or datetime.now()
+            leg_url = train.get_treinposities(dt)
+            leg_text = f"{train.type}-{train.lengte} {leg.description}"
+            if leg_url:
+                leg_text = f"<{leg_url}|{leg_text}>"
+            text += f"\n{emoji} {leg.get_drukte_emoji()} {leg_text}"
         blocks.append(
             {
                 "type": "section",
