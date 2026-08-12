@@ -270,6 +270,12 @@ def main():
                                            from_station="DT", to_station="UT", via_station="RTD")
     schedule.every().monday.at("14:55").do(send_message, time="15:57", journeys=1, user_id="U2UMXJQ7R",
                                            from_station="DT", to_station="UT", via_station="GVC")
+    schedule.every().tuesday.at("16:15").do(send_message, time="17:37", journeys=1, user_id="U2UMXJQ7R",
+                                            from_station="UT", to_station="LEDN", via_station="ASDZ")
+    schedule.every().wednesday.at("15:05").do(send_message, time="15:59", journeys=1, user_id="U2UMXJQ7R",
+                                             from_station="DT", to_station="UT", via_station="RTD")
+    schedule.every().wednesday.at("15:05").do(send_message, time="15:57", journeys=1, user_id="U2UMXJQ7R",
+                                             from_station="DT", to_station="UT", via_station="GVC")
     schedule.every().thursday.at("15:05").do(send_message, time="15:59", journeys=1, user_id="U2UMXJQ7R",
                                              from_station="DT", to_station="UT", via_station="RTD")
     schedule.every().thursday.at("15:05").do(send_message, time="15:57", journeys=1, user_id="U2UMXJQ7R",
@@ -278,8 +284,6 @@ def main():
                                            from_station="DT", to_station="UT", via_station="RTD")
     schedule.every().friday.at("15:05").do(send_message, time="15:57", journeys=1, user_id="U2UMXJQ7R",
                                            from_station="DT", to_station="UT", via_station="GVC")
-    schedule.every().tuesday.at("16:15").do(send_message, time="17:37", journeys=1, user_id="U2UMXJQ7R",
-                                            from_station="UT", to_station="LEDN", via_station="ASDZ")
 
     print("Starting scheduler...")
     while True:
